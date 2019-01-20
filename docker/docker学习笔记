@@ -1,0 +1,77 @@
+#####################################
+#1.docker常用命令
+#1.1查看容器日志
+docker logs 容器名 / docker service logs 
+#1.2查看容器状态
+docker stats
+#1.3 docker挂载目录时,目录的权限问题,用下面这个'svirt_sandbox_file_t',
+#    尽量不要在docker run时用 --privileged=true
+sudo chcon -Rt svirt_sandbox_file_t /var/log/nginx/
+#我们使用运行Docker容器的默认类型是svirt_lxc_net_t。运行所有容器进程与这种类型。
+#1.4 docker tag,不加版本号,默认lastest,打tag方便标识一点
+docker tag 镜像名:版本号  diy名:版本号
+docker tag docker.io/gogs/gogs gogs:liukx
+#1.5 Dockerfile,文件名:Dockerfile
+#内容:增加mysql utf-8,my.cnf和Dockerfile在一个目录
+FROM docker.io/mysql:latest
+MAINTAINER liukx
+ADD my.cnf /etc/mysql/
+命令:
+docker build -t 'jingxiangming/liukx/mysqlutf8' --no-cache=true .
+# 如果报错,'.'是必须的,重命名dockerfile文件名，把DockerFile改为Dockerfile
+#1.6 docker的网络模式,docker run时,通过--net参数指定,docker可以创建自定义网络(详细的百度),--net=mydiynetwork
+docker network ls
+brctl show
+#1.7 设置容器自启动
+docker update --restart=always 容器名/id 
+docker exec -it mysql (bin/bash)(bash)/(bin/sh)
+#1.8 docker查看容器的ip
+docker inspect -f='{{.Name}} {{.NetworkSettings.IPAddress}} {{.HostConfig.PortBindings}}' $(docker ps -aq)
+####################################
+#2.dockers run常用
+#2.1 mysql
+docker run --name mysql  -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=1234 -v /data/mysql:/var/lib/mysql -v /etc/localtime:/etc/localtime liukx/mysqlutf8
+#完善的写法
+docker run --name mysql -p 3306:3306 \
+--privileged=true \
+-v /docker/data/mysql/database:/var/lib/mysql \
+-v /docker/data/mysql/conf:/etc/mysql \
+-e MYSQL_ROOT_PASSWORD=1234 -d liukx/mysqlutf8
+#2.2 gogs,这里遇到一个坑,在gogs容器内,curl 宿主ip:10080总是访问不到,报错host is unreachable,以为是dns问题,
+#   但是ping 宿主ip是通的,后来发现是防火墙的原因,/笑哭
+#容器之间可以直接访问,直接使用mysql的容器ip172.13.2.2:3306连接就可以,但是每次启动,容器的ip都可能会变,
+gogs使用下面的语句创建数据库
+create database gogs default character set utf8 collate utf8_general_ci;
+docker run --name=gogs -d -p 10022:22 -p 10080:3000 -v /docker/data/gogs:/data docker.io/gogs/gogs:latest
+docker run --name=gogs -d -p 10022:22 -p 10080:3000 --privileged=true(尽量不要用) -v /docker/data/gogs:/data docker.io/gogs/gogs:latest
+#2.3 nginx log目录可以不用挂载,好像是链接,看不到内容,使用docker logs nginx
+docker run --name nginx \
+ -p 80:80 -p 443:443  \
+ -v /etc/nginx:/etc/nginx \
+ -v /var/www/main:/var/www/main \
+ -v /var/log/nginx:/var/log/nginx \ 
+ -d docker.io/nginx
+#赋予权限,尽量不要用 --privileged=true
+sudo chcon -Rt svirt_sandbox_file_t /var/log/nginx/
+
+#########################################################################################
+#其他未整理
+#docker 宿主可以ping通容器,容器也能ping通宿主,但是容器无法访问宿主的端口
+# bridge模式是Docker默认的网络设置，此模式会为每一个容器分配Network Namespace、设置IP等，并将一个主机上的Docker容器连接到一个虚拟网桥上。下面着重介绍一下此模式。
+# https://www.cnblogs.com/gispathfinder/p/5871043.html
+
+当Docker server启动时，会在主机上创建一个名为docker0的虚拟网桥(宿主通过ip addr / ifconig可以看到)，此主机上启动的Docker容器会连接到这个虚拟网桥上。虚拟网桥的工作方式和物理交换机类似，这样主机上的所有容器就通过交换机连在了一个二层网络中。
+接下来就要为容器分配IP了，Docker会从RFC1918所定义的私有IP网段中，选择一个和宿主机不同的IP地址和子网分配给docker0(容器内通过ip addr也可以看到ip信息)，
+连接到docker0的容器就从这个子网中选择一个未占用的IP使用。如一般Docker会使用172.17.0.0/16这个网段，
+并将172.17.42.1/16分配给docker0网桥（在主机上使用ifconfig命令是可以看到docker0的，可以认为它是网桥的管理接口，在宿主机上作为一块虚拟网卡使用）。单机环境下的网络拓扑如下，主机地址为10.10.101.105/24。
+
+sudo iptables -L
+
+
+
+#路由命令
+route
+
+#vim主题位置,
+/usr/share/vim/vim74/colors/
+
