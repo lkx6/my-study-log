@@ -75,3 +75,65 @@ route
 #vim主题位置,
 /usr/share/vim/vim74/colors/
 
+docker pull rabbitmq:management
+#相关容器运行
+#tomcat
+docker run -p 8081:8080 --name tinyriver \
+  -v /opt/app_logs:/opt/app_logs \
+   -v /opt/docker/tinyriver.war:/usr/local/tomcat/webapps/tinyriver.war \
+ -d liukx/tomcat
+
+#tinyriver-app
+docker run -d --name tinyapp \
+ -v /opt/app_logs:/opt/app_logs \
+ -v /opt/docker/oldriver-app.jar:/opt/oldriver-app.jar \
+  liukx/tomcat  \
+  java -jar /opt/oldriver-app.jar
+
+#rabbitmq
+  docker run -d --name mq --hostname tiny-mq \
+  -p 15672:15672  -p 5672:5672  \
+  -p 25672:25672  -p 61613:61613  \
+  -p 1883:1883 \
+  rabbitmq:management
+
+docker run -d -p 8444:8444 \
+--name sso-admin \
+-v /opt/docker/test/sso-monitor.jar:/opt/sso-monitor.jar liukx/tomcat \
+java -Xms200m -Xmx200m -jar /opt/sso-monitor.jar --server.port=8444 --base.url=39.108.123.92 -Xms200m -Xmx200m
+
+
+docker run -d -p 8888:8888 \
+--name sso-config \
+-v /opt/docker/test/sso-config.jar:/opt/sso-config.jar liukx/tomcat \
+java -Xms200m -Xmx200m -jar /opt/sso-config.jar --server.port=8888 --base.url=39.108.123.92 -Xms200m -Xmx200m
+
+#tips:jvm参数改了,在spring-admin上看到的还是原来的,只是因为显示没有刷新的原因,看内存是生效了的
+
+#tinyriver 启动时,配置log文件夹,是否加载任务
+docker run -d -p 8080:8080 \
+--name tiny_with_task \
+-v /opt/app_logs:/opt/app_logs \
+-v /opt/docker/tinyriver-web.jar:/opt/tinyriver-web.jar \
+liukx/tomcat \
+java -jar -Dload_task=true -Dlog4j_file_folder=tiny_with_task /opt/tinyriver-web.jar
+
+#19.01.29,最新
+docker run -d -p 8081:8081 \
+--name tiny1 \
+-v /opt/app_logs:/opt/app_logs \
+-v /opt/docker/tinyriver-web.jar:/opt/tinyriver-web.jar \
+liukx/tomcat \
+java -jar -Xms300m -Xmx300m -Dbase.url=192.168.0.157 -Dlog_file_name=/opt/app_logs/tiny1/tinyriver.log /opt/tinyriver-web.jar --server.port=8081
+
+docker run -d -p 8092:8092 \
+--name tinyapp2 \
+-v /opt/app_logs:/opt/app_logs \
+-v /opt/docker/oldriver-app.jar:/opt/oldriver-app.jar \
+liukx/tomcat \
+java -jar -Xms300m -Xmx300m -Dbase.url=192.168.0.157 -Dlog_file_name=/opt/app_logs/tinyapp2/tinyriver-app.log /opt/oldriver-app.jar --server.port=8092
+
+#ssr shadowsocksR代理
+docker run -it -p 30000:8388 --name ssr -e "PASSWORD=llkkee11" -e "METHOD=aes-256-cfb" -d docker.io/esme518/docker-shadowsocksr
+
+
